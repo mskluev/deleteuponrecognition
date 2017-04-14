@@ -1,0 +1,79 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Specify minimum Vagrant version and Vagrant API version
+Vagrant.require_version '>= 1.8.0'
+VAGRANTFILE_API_VERSION = '2'
+
+# Require 'yaml', 'fileutils', and 'erb' modules
+require 'yaml'
+require 'fileutils'
+require 'erb'
+
+# Look for user-data file to configure/customize CoreOS boxes
+# No changes should need to be made to this file
+USER_DATA = File.join(File.dirname(__FILE__), 'user-data')
+
+# Read YAML file with VM details (box, CPU, RAM, IP addresses)
+# Edit machines.yml to change VM configuration details
+machines = YAML.load_file(File.join(File.dirname(__FILE__), 'machines.yml'))
+
+# Maintain a list of roles and machines in that role
+ansibleGroups = {};
+
+# Create and configure the VMs
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+
+  # Always use Vagrant's default insecure key
+  config.ssh.insert_key = false
+
+  # Iterate through entries in YAML file to create VMs
+  machines.each_with_index do |machine, index|
+
+    # Configure the VMs per details in machines.yml
+    config.vm.define machine['name'] do |srv|
+
+      # Don't check for box updates
+      srv.vm.box_check_update = false
+
+      # Specify the hostname of the VM
+      srv.vm.hostname = machine['name']
+
+      # Add to appropriate ansible groups
+      if ansibleGroups[machine['role']] != nil
+        ansibleGroups[machine['role']].push machine['name']
+      else
+        ansibleGroups[machine['role']] = [machine['name']]
+      end
+
+      # Specify the Vagrant box to use (use VMware box by default)
+      srv.vm.box = machine['box']['vb']
+
+      # Configure default synced folder (disable by default)
+      srv.vm.synced_folder '.', '/vagrant', disabled: true
+
+      # Assign additional private network
+      if machine['ip_addr'] != nil
+        srv.vm.network 'private_network', ip: machine['ip_addr']
+      end # if machine['ip_addr']
+
+      # Configure CPU & RAM per settings in machines.yml (VirtualBox)
+      srv.vm.provider 'virtualbox' do |vb, override|
+        vb.memory = machine['ram']
+        vb.cpus = machine['vcpu']
+        override.vm.box = machine['box']['vb']
+
+      end # srv.vm.provider 'virtualbox'
+
+      if index == machines.size - 1
+        # on last machine execute ansible in parallel mode
+        srv.vm.provision :ansible do |ansible|
+          # Disable default limit to connect to all the machines
+          ansible.limit = "all"
+          ansible.playbook = "playbook.yml"
+          ansible.groups = ansibleGroups
+        end
+      end
+    end # config.vm.define
+  end # machines.each
+end # Vagrant.configure
