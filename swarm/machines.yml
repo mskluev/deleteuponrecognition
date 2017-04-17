@@ -6,13 +6,13 @@
   vcpu: "1"
   ip_addr: "192.168.1.101"
   role: "host"
-- name: "host-02"
-  box:
-    vb: "centos/7"
-  ram: "1024"
-  vcpu: "1"
-  ip_addr: "192.168.1.102"
-  role: "host"
+#- name: "host-02"
+#  box:
+#    vb: "centos/7"
+#  ram: "1024"
+#  vcpu: "1"
+#  ip_addr: "192.168.1.102"
+#  role: "host"
 #- name: "host-03"
 #  box:
 #    vb: "centos/7"
