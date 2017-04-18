@@ -10,10 +10,6 @@ require 'yaml'
 require 'fileutils'
 require 'erb'
 
-# Look for user-data file to configure/customize CoreOS boxes
-# No changes should need to be made to this file
-USER_DATA = File.join(File.dirname(__FILE__), 'user-data')
-
 # Read YAML file with VM details (box, CPU, RAM, IP addresses)
 # Edit machines.yml to change VM configuration details
 machines = YAML.load_file(File.join(File.dirname(__FILE__), 'machines.yml'))
@@ -50,7 +46,11 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       srv.vm.box = machine['box']['vb']
 
       # Configure default synced folder (disable by default)
-      srv.vm.synced_folder '.', '/vagrant', disabled: true
+      if machine['sync_disabled'] != nil
+        srv.vm.synced_folder '.', '/vagrant', disabled: machine['sync_disabled']
+      else
+        srv.vm.synced_folder '.', '/vagrant', disabled: true
+      end #if machine['sync_disabled']
 
       # Assign additional private network
       if machine['ip_addr'] != nil
@@ -73,6 +73,11 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
           ansible.playbook = "provisioning/playbook.yml"
           ansible.groups = ansibleGroups
         end
+      end
+
+      # 1.9.1 workaround for centos/7 https://github.com/mitchellh/vagrant/issues/8096
+      if Vagrant::VERSION == "1.9.1" && srv.vm.box == "centos/7"
+        srv.vm.provision "shell", inline: "service network restart", run: "always"
       end
     end # config.vm.define
   end # machines.each
