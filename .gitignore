@@ -1,1 +1,5 @@
+# don't commit vagrant machine info
 .vagrant
+
+# don't commit failed ansible run info
+*.retry

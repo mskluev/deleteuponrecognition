@@ -1,0 +1,8 @@
+---
+- hosts: managers
+  - name: start docker swarm manager
+    command: docker swarm init --advertise-addr {{swarm_manager_ip}} --listen-addr 0.0.0.0:{{swarm_manager_port}}
+
+  - name: store swarm manager worker key
+    command: docker swarm join-token --quiet worker
+    register: worker_swarm_key
