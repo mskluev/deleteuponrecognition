@@ -65,6 +65,11 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
       end # srv.vm.provider 'virtualbox'
 
+      # 1.9.1 workaround for centos/7 https://github.com/mitchellh/vagrant/issues/8096
+      if Vagrant::VERSION == "1.9.1" && srv.vm.box == "centos/7"
+        srv.vm.provision "shell", inline: "service network restart", run: "always"
+      end
+
       if index == machines.size - 1
         # on last machine execute ansible in parallel mode
         srv.vm.provision :ansible do |ansible|
@@ -72,13 +77,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
           ansible.limit = "all"
           ansible.playbook = "provisioning/playbook.yml"
           ansible.groups = ansibleGroups
-        end
-      end
+        end # srv.vm.provision :ansible
+      end # if index == machines.size - 1
 
-      # 1.9.1 workaround for centos/7 https://github.com/mitchellh/vagrant/issues/8096
-      if Vagrant::VERSION == "1.9.1" && srv.vm.box == "centos/7"
-        srv.vm.provision "shell", inline: "service network restart", run: "always"
-      end
     end # config.vm.define
   end # machines.each
 end # Vagrant.configure
