@@ -1,8 +1,72 @@
 ---
-- hosts: managers
-  - name: start docker swarm manager
-    command: docker swarm init --advertise-addr {{swarm_manager_ip}} --listen-addr 0.0.0.0:{{swarm_manager_port}}
+# determine the status of each manager node and break them
+# into two groups:
+#   - swarm_manager_operational (swarm is running and active)
+#   - swarm_manager_bootstrap (host needs to be joined to the cluster)
+- name: determine swarm status
+  shell: >
+    docker info | egrep '^Swarm: ' | cut -d ' ' -f2
+  register: swarm_status
 
-  - name: store swarm manager worker key
-    command: docker swarm join-token --quiet worker
-    register: worker_swarm_key
+- name: create swarm_manager_operational group
+  add_host:
+    hostname: "{{ item }}"
+    groups: swarm_manager_operational
+  with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+  when: "'active' in hostvars[item].swarm_status.stdout_lines"
+  run_once: true
+
+- name: create swarm_manager_bootstrap group
+  add_host:
+    hostname: "{{ item }}"
+    groups: swarm_manager_bootstrap
+  with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+  when: "'active' not in hostvars[item].swarm_status.stdout_lines"
+  run_once: true
+
+- name: populate list of manager ips
+  add_host:
+    hostname: "{{ ansible_eth1.ipv4.address }}"
+    groups: swarm_manager_ips
+  with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+
+# when the swarm_manager_operational group is empty, meaning there
+# are no hosts running swarm, we need to initialize one of the hosts
+# then add it to the swarm_manager_operational group
+- name: initialize swarm cluster
+  run_once: true
+  shell: >
+    docker swarm init
+    --advertise-addr={{ ansible_eth1.ipv4.address }}:2377
+  when: "'swarm_manager_operational' not in groups"
+  register: bootstrap_first_node
+
+- name: add initialized host to swarm_manager_operational group
+  run_once: true
+  add_host:
+    hostname: "{{ item }}"
+    groups: swarm_manager_operational
+  with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+  when: bootstrap_first_node | changed
+
+# retrieve the swarm tokens and populate a list of ips listening on
+# the swarm port 2377
+- name: retrieve swarm manager token
+  run_once: true
+  shell: docker swarm join-token -q manager
+  register: swarm_manager_token
+
+- name: retrieve swarm worker token
+  run_once: true
+  shell: docker swarm join-token -q worker
+  register: swarm_worker_token
+
+# join the manager hosts not yet initialized to the swarm cluster
+- name: join manager nodes to cluster
+  when: inventory_hostname != ansible_play_hosts[0]
+  vars:
+    token: "{{ hostvars[groups['swarm_manager_operational'][0]]['swarm_manager_token']['stdout'] }}"
+  shell: >
+    docker swarm join
+    --token={{ token }}
+    {{ groups['swarm_manager_ips'][0] }}:2377

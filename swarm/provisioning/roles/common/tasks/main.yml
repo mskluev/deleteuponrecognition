@@ -15,7 +15,7 @@
     name: docker-ce
     state: present
 
-- name: ensure starts on system boot
+- name: ensure docker starts on system boot
   service:
     name: docker
     enabled: yes

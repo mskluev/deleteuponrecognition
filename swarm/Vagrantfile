@@ -77,6 +77,11 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
           ansible.limit = "all"
           ansible.playbook = "provisioning/playbook.yml"
           ansible.groups = ansibleGroups
+          ansible.host_key_checking = false
+          ansible.verbose = 'vvvv'
+          ansible.extra_vars = {
+              swarm_iface: "eth1"
+            }
         end # srv.vm.provision :ansible
       end # if index == machines.size - 1
 

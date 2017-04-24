@@ -4,6 +4,5 @@
   become_user: root
   roles:
     - common
-    
-- include: managers.yml
-- include: workers.yml
+
+- include: swarm.yml

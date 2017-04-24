@@ -1,4 +1,0 @@
----
-- hosts: worker
-  roles:
-#    - swarmworker

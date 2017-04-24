@@ -1,0 +1,33 @@
+# determine the status of each worker node and break them
+# into two groups:
+#   - swarm_worker_operational (host is joined to the swarm cluster)
+#   - swarm_worker_bootstrap (host needs to be joined to the cluster)
+- name: determine swarm status
+  shell: >
+    docker info | egrep '^Swarm: ' | cut -d ' ' -f2
+  register: swarm_status
+
+- name: create swarm_worker_operational group
+  add_host:
+    hostname: "{{ item }}"
+    groups: swarm_worker_operational
+  with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+  when: "'active' in hostvars[item].swarm_status.stdout_lines"
+  run_once: true
+
+- name: create swarm_worker_bootstrap group
+  add_host:
+    hostname: "{{ item }}"
+    groups: swarm_worker_bootstrap
+  with_items: "{{ ansible_play_hosts | default(play_hosts) }}"
+  when: "'active' not in hostvars[item].swarm_status.stdout_lines"
+  run_once: true
+
+# join the worker hosts not yet initialized to the swarm cluster
+- name: join worker nodes to cluster
+  vars:
+    token: "{{ hostvars[groups['swarm_manager_operational'][0]]['swarm_worker_token']['stdout'] }}"
+  shell: >
+    docker swarm join
+    --token={{ token }}
+    {{ groups['swarm_manager_ips'][0] }}:2377

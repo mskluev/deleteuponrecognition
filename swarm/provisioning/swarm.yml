@@ -1,0 +1,8 @@
+---
+- hosts: manager
+  roles:
+    - swarmmanager
+
+- hosts: worker
+  roles:
+    - swarmworker

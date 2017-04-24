@@ -1,3 +1,0 @@
----
-- name: workers join swarm
-  command: docker swarm join --token {{ swarm_worker_key }} {{swarm_manager_ip}}:{{swarm_manager_port}}
